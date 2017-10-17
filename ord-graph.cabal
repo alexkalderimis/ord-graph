@@ -14,6 +14,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Data.Ord.Graph
+                     , Data.Ord.Graph.Algorithms
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , mtl
@@ -26,7 +27,7 @@ library
 test-suite ord-graph-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Data/Ord/GraphTest.hs
+  main-is:             Spec.hs
   build-depends:       base
                      , ord-graph
                      , hspec

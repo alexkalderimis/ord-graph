@@ -28,6 +28,7 @@ library.
 -}
 module Data.Ord.Graph
   ( Graph(..), vertMap, edgeMap
+  , edge, vertex
   , Ctxt(..), before, here, after
   , allVerts, iallVerts
   , edgesTo, edgesFrom, allEdges
@@ -63,9 +64,11 @@ module Data.Ord.Graph
   , path, ipath
   , match, addCtxt
   , toDecomp, fromDecomp, decomp
+  , t
   ) where
 
 import           Control.Arrow
+import           Control.Applicative hiding (empty)
 import           Control.Lens
 import           Control.Monad.State
 import           Control.Monad.Except
@@ -82,7 +85,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Sequence as Seq
 import           Data.List (partition, minimumBy)
-import           Data.Maybe (catMaybes, mapMaybe)
+import           Data.Maybe (catMaybes, mapMaybe, fromMaybe)
 
 import           Prelude as P hiding (reverse)
 
@@ -122,6 +125,9 @@ iallVerts = vertMap . itraverse . indexed
 -- | A traversal which selects all edges between two indices.
 edge :: Ord i => i -> i -> Traversal' (Graph i e v) e
 edge i1 i2 = edgeMap . ix i1 . ix i2
+
+vertex :: Ord i => i -> Traversal' (Graph i e v) v
+vertex i = vertMap . ix i
 
 -- | A traversal which selects all edges that originate at an index.
 edgesFrom :: Ord i => i -> Traversal' (Graph i e v) e

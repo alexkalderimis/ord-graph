@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-module Main where
+module Data.Ord.GraphSpec (spec) where
 
 import Control.Lens
 import Test.Hspec
@@ -8,8 +8,8 @@ import Data.Ord.Graph
 import qualified Data.Map as M
 import Prelude hiding (reverse)
 
-main :: IO ()
-main = hspec $
+spec :: Spec
+spec = 
   describe "Graphs" $ do
     it "reversal should be involutive" (property prop_reverseInvolutive)
     it "dfs should be a valid traversal" (property (prop_bitravPure dfs))
@@ -52,3 +52,4 @@ prop_reachRebuild k g = reached k g `union` reaches k g == g || k `notElem` idxs
 
 prop_decomp :: IGraph -> Bool
 prop_decomp g = fromDecomp (toDecomp g) == g
+
