@@ -10,6 +10,7 @@
            , RankNTypes
            , NoMonomorphismRestriction
            , FunctionalDependencies
+           , ViewPatterns
            #-}
 
 module Data.Ord.Graph.AlgorithmsGeneric (
@@ -134,9 +135,15 @@ reconstructPath g = -- maybe (fail "Could not reconstruct path") return
 constantEstimate :: (Num n) => a -> a -> n
 constantEstimate _ _ = 0
 
+class (Real n) => CartesianCoordinate x n | x -> n where
+    xy :: x -> (n, n)
+
+instance (Real n) => CartesianCoordinate (n, n) n where
+    xy = id
+    
 -- general purpose function for computing a straight-line distance
 -- between two points on a cartesian plane
-cartesianDistance :: (Real n, Floating b) => (n, n) -> (n, n) -> b
-cartesianDistance (x0, y0) (x1, y1) = sqrt $ dx ^ 2 + dy ^ 2
+cartesianDistance :: (CartesianCoordinate c n, Real n, Floating b) => c -> c -> b
+cartesianDistance (xy -> (x0, y0)) (xy -> (x1, y1)) = sqrt $ dx ^ 2 + dy ^ 2
     where dx = realToFrac . abs $ x1 - x0
           dy = realToFrac . abs $ y1 - y0
