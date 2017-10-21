@@ -15,6 +15,10 @@ library
   hs-source-dirs:      src
   exposed-modules:     Data.Ord.Graph
                      , Data.Ord.Graph.Algorithms
+                     , Data.Ord.Graph.AlgorithmsGeneric
+                     , Data.Ord.Graph.Algorithms.SearchState
+                     , Data.Ord.Graph.Algorithms.HashableQueueState
+                     , Data.Ord.Graph.Algorithms.PriorityQueueState
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , mtl
@@ -22,6 +26,9 @@ library
                      , lens
                      , bifunctors
                      , QuickCheck
+                     , fingertree
+                     , unordered-containers
+                     , hashable
   default-language:    Haskell2010
 
 test-suite ord-graph-test
@@ -34,8 +41,27 @@ test-suite ord-graph-test
                      , QuickCheck
                      , lens
                      , containers
+                     , hashable
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
+
+benchmark astar
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test, bench
+  main-is:          MainBenchmarkSuite.hs
+  build-depends:    base
+                  , criterion
+                  , random
+                  , ord-graph
+                  , lens
+                  , containers
+                  , QuickCheck
+                  , lens
+                  , unordered-containers
+                  , hashable
+                  , mtl
+  ghc-options:      -Wall -O2
+  default-language: Haskell2010   
 
 source-repository head
   type:     git

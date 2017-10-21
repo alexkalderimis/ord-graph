@@ -46,12 +46,12 @@ import Data.List.NonEmpty (nonEmpty)
 import Data.Ord.Graph
 
 
-data AStarState v i n = AStarState { _closedSet :: Set i
+data AStarState i n = AStarState { _closedSet :: Set i
                                  , _openSet :: Set i
                                  , _cameFrom :: Map i i
                                  , _knownCost :: Map i n
                                  , _estimatedCost :: Map i n
-                                 , _estimate :: (v -> n)
+                                 , _estimate :: (i -> n)
                                  }
 makeLenses ''AStarState
 
@@ -60,16 +60,16 @@ data PathSegment i e v = PathNode i v
                        deriving (Show, Read, Data, Eq)
 
 type Path i e v = [PathSegment i e v]
-type AStarT v i n a = StateT (AStarState v i n) Maybe a
+type AStarT i n a = StateT (AStarState i n) Maybe a
 
-initialState :: (Ord i, Num cost, Ord cost) => i -> v -> v -> (v -> v -> cost) -> AStarState v i cost
-initialState startIdx startE goalE heuristic = AStarState
+initialState :: (Ord i, Num cost, Ord cost) => i -> i -> (i -> i -> cost) -> AStarState i cost
+initialState startIdx goal heuristic = AStarState
     { _closedSet = mempty
     , _openSet = S.singleton startIdx
     , _cameFrom = mempty
     , _knownCost = M.singleton startIdx 0
-    , _estimatedCost = M.singleton startIdx $ heuristic startE goalE
-    , _estimate = flip heuristic goalE
+    , _estimatedCost = M.singleton startIdx $ heuristic startIdx goal
+    , _estimate = flip heuristic goal
     }
 
 -- Dijkstra is a special case of A* where the heuristic is 0 for all nodes
@@ -95,7 +95,7 @@ dijkstra = astar (\a b -> 0)
 --  to have two edges with different weights between the same two nodes. You can fake that with synthetic nodes
 --  if required.
 astar :: (Ord i, Ord n, Num n)
-      => (v -> v -> n) -- node distance heuristic function
+      => (i -> i -> n) -- node distance heuristic function
       -> (e -> n)      -- edge distance function
       -> Graph i e v   -- graph to search within
       -> i        -- start
@@ -105,7 +105,7 @@ astar heuristic distance g start goal = do
     -- make sure these indices are actually in the graph
     a <- g ^? vertex start
     b <- g ^? vertex goal
-    join . evalStateT go $ initialState start a b heuristic
+    join . evalStateT go $ initialState start goal heuristic
     where
         go = do
             curr <- current
@@ -132,11 +132,10 @@ astar heuristic distance g start goal = do
         isImprovementOn c = maybe True (c <)
 
         record prev idx cost = do
-            v   <- lift $ g ^? vertex idx
             est <- use estimate
             cameFrom      %= M.insert idx prev
             knownCost     %= M.insert idx cost
-            estimatedCost %= M.insert idx (cost + est v)
+            estimatedCost %= M.insert idx (cost + est idx)
 
         costOf i = gets (M.lookup i . view knownCost)
         costOf' i = costOf i >>= lift -- skip on failure
@@ -158,10 +157,10 @@ reconstructPath g idx history = fmap intersperseEdges
           intersperseEdges xs = xs
           go h i is = case M.lookup i h of
                         Nothing -> is
-                        Just next -> go (M.delete i h) next (next : is)
+                        Just next -> go h next (next : is)
 
 -- current node, drawn from the open-set, ordered by estimated distance to goal
-current :: (Ord i, Ord n) => AStarT v i n i
+current :: (Ord i, Ord n) => AStarT i n i
 current = do
     costs <- use estimatedCost
     lift =<< (gets $ fmap ( fst
