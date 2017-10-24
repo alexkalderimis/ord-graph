@@ -13,6 +13,7 @@ import           Criterion.Main
 
 import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.State
+import           Control.Monad.Writer.Lazy
 import           Data.Hashable
 import qualified Data.Ord.Graph as G
 import qualified Data.Ord.Graph.AlgorithmsGeneric as AG
@@ -45,12 +46,17 @@ astarHashable :: (Ord i, Hashable i, Eq i, Ord n, Num n, MonadFail m)
 astarHashable h d g i j = let s = hashableQueueState i j h d
     in evalStateT (AG.astarGeneric g) s
 
+cd :: Idx -> Idx -> Float
+cd = AG.euclideanDistance
+
+runIPath :: UnLattice -> Idx -> Idx -> Maybe (AG.Path Idx Edge String)
+runIPath g i j = G.ipath i j addEdge addNode g >>= execWriterT
+    where addEdge i j e = writer (e, [AG.PathEdge i j e])
+          addNode i v = writer (v, [AG.PathNode i v])
+
 main :: IO ()
 main = do
     let
-        cd :: Idx -> Idx -> Float
-        cd = AG.cartesianDistance
-
         (Lattice s) = zigzag 10 10
         (Lattice m) = zigzag 100 100
         (Lattice l) = zigzag 250 250
@@ -74,4 +80,5 @@ main = do
         [ bgroup "data.map" (benches a)
         , bgroup "fingertrees" (benches ag)
         , bgroup "hashable" (benches hg)
+        , bgroup "ipath" (benches runIPath)
         ]

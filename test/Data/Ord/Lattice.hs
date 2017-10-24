@@ -10,10 +10,8 @@ import Control.Monad
 import Data.Monoid
 import Control.Lens hiding (elements)
 import Test.QuickCheck
-import qualified Data.List as L
 
 import qualified Data.Ord.Graph as G
-import           Data.Ord.Graph.Algorithms 
 
 newtype Lattice = Lattice { unlattice :: G.Graph (Int, Int) Float String }
                 deriving (Show, Eq)
@@ -22,18 +20,20 @@ instance Arbitrary Lattice where
     arbitrary = let dim = arbitrary `suchThat` (> 0) `suchThat` (< 50)
                 in lattice <$> dim <*> dim
 
-data Edge = Missing | Bidirectional | Upwards | Downwards
+data Edge = Missing | Bidirectional | Upwards | Downwards | Diag Bool Bool Bool Bool
 
+-- for debugging and development
 printLattice :: G.Graph (Int, Int) Float String -> IO ()
 printLattice g = do
     let inds = G.idxs g
         (maxX, maxY)  = maximum inds
-    forM_ [-1 .. maxY] $ \y -> do
+    forM_ [-1 .. succ maxY] $ \y -> do
         printVerticalRow maxX y
         printHorizontalRow maxX y
     where
+        printVerticalRow _ y | y <= 0 = return ()
         printVerticalRow mx y = do
-            let edges = map (\x -> edgeAt x y) [0 .. mx]
+            let edges = concatMap (\x -> edgeAt x y) [0 .. mx]
             putStr $ edgesToLine edges
         printHorizontalRow mx y = do
             let nodes = map (\x -> nodeAt x y) [0 .. mx]
@@ -53,35 +53,53 @@ printLattice g = do
                          above = (x, pred y)
                          upwards = has (G.edge here above) g
                          downwards = has (G.edge above here) g
-                     in case (upwards, downwards) of
-                        (True, True) -> Bidirectional
-                        (True, False) -> Upwards
-                        (False, True) -> Downwards
-                        (False, False) -> Missing
-        edgesToLine es = unlines [ ' ' : (L.intercalate "   " $ map (fromEdge Upwards) es)
-                                 , ' ' : (L.intercalate "   " $ map (fromEdge Bidirectional) es)
-                                 , ' ' : (L.intercalate "   " $ map (fromEdge Downwards) es)
+                         tl = has (G.edge (succ x, y) above) g
+                         tr = has (G.edge here (succ x, pred y)) g
+                         br = has (G.edge above (succ x, y)) g
+                         bl = has (G.edge (succ x, pred y) here) g
+                         ve = case (upwards, downwards) of
+                                (True, True) -> Bidirectional
+                                (True, False) -> Upwards
+                                (False, True) -> Downwards
+                                (False, False) -> Missing
+                     in [ve, Diag tl tr br bl]
+        edgesToLine es = unlines [ ' ' : concatMap (fromEdge Upwards) es
+                                 , ' ' : concatMap (fromEdge Bidirectional) es
+                                 , ' ' : concatMap (fromEdge Downwards) es
                                  ]
 
         nodesToLine [] = []
         nodesToLine ((l, r, n) : ns) = concat [ lhs l
-                                           , if n then "*" else " "
+                                           , if n then "▪" else " "
                                            , rhs r
                                            , nodesToLine ns
                                            ]
-        lhs (Just True) = ">"
+        lhs (Just True) = "→"
         lhs (Just False) = "-"
         lhs Nothing      = " "
-        rhs (Just True) = "<-"
+        rhs (Just True) = "←-"
         rhs (Just False) = "--"
         rhs Nothing      = "  "
 
+        fromEdge Upwards   (Diag tl tr tl' tr') = corner '┌' '╲' tl tl' : ' ' : corner '┐' '╱' tr tr' : []
+        fromEdge Downwards (Diag br' bl' br bl) = corner '└' '╱' bl bl' : ' ' : corner '┘' '╲' br br' : []
+        fromEdge Bidirectional (Diag tl tr tl' tr') = ' ' : case (tl || tl', tr || tr') of
+                                                                (True, True) -> 'x'
+                                                                (True, False) -> '╲'
+                                                                (False, True) -> '╱'
+                                                                _             -> ' '
+                                                          : " "
+
         fromEdge _       Missing = " "
-        fromEdge Upwards Upwards = "^"
-        fromEdge Upwards Bidirectional = "^"
-        fromEdge Downwards Downwards = "v"
-        fromEdge Downwards Bidirectional = "v"
+        fromEdge Upwards Upwards = "↑"
+        fromEdge Upwards Bidirectional = "↑"
+        fromEdge Downwards Downwards = "↑"
+        fromEdge Downwards Bidirectional = "↓"
         fromEdge _ _ = "|"
+
+        corner _ _ False False = ' '
+        corner a _ True _ = a
+        corner _ t _ True = t
 
 lattice :: Int -> Int -> Lattice
 lattice w h = Lattice $ G.fromLists (map (\pos -> (pos, showv pos)) vs) es
@@ -91,8 +109,9 @@ lattice w h = Lattice $ G.fromLists (map (\pos -> (pos, showv pos)) vs) es
         showv (x, y) = show x <> "-" <> show y
         vs = [(x, y) | x <- [0 .. w], y <- [0 .. h]]
         es = concatMap linkToNeighbours vs
+        inBounds i x y = (x, y) /= i && x >= 0 && x <= w && y >= 0 && y <= h
         linkToNeighbours i@(x, y) = map (\(x', y', d) -> (i, (x', y'), d))
-                                    $ filter (\(x, y, _) -> (x, y) /= i && x >= 0 && x <= w && y >= 0 && y <= h)
+                                    $ filter (\(v, v', _) -> inBounds i v v')
                                     $ [ (pred x, y,      straight), (succ x, y,      straight) -- L/R
                                       , (x,      pred y, straight), (x,      succ y, straight) -- T/B
                                       , (pred x, pred y, diagonal), (succ x, succ y, diagonal) -- TL/BR

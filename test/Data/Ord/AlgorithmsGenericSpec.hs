@@ -46,14 +46,17 @@ spec = describe "GenericAlgorithms" $ do
         edges path `shouldBe` ["e1", "sc0", "sc1", "sc2"]
 
     describe "lattices" $ do
+        {-
         it "finds any index within an aribitray lattice" $ property $ \(LatticeBounds x y pos) ->
             S.member pos (G.idxSet . unlattice $ lattice x y)
         it "finds any edge with an arbitrary lattice" $ property $ \(LatticeWithEdge w h (i, j)) ->
             G.edge i j `has` (unlattice $ lattice w h)
+        -}
         let Lattice g = lattice 5 4
             go = dijkstra id g
+
         it "allow any node to be reached from any other" $ property $ \(PathSearchInput (Lattice g) start end) ->
-            maybe False (not . null) $ astar cartesianDistance id g start end
+            maybe False (not . null) $ astar euclideanDistance id g start end
         it "Can go horizontally" $ do
             path <- dijkstra (const 1) g (0, 1) (4, 1)
             length (nodes path) `shouldBe` 5
@@ -61,7 +64,7 @@ spec = describe "GenericAlgorithms" $ do
             let Just path = go (1, 0) (1, 3)
             length (nodes path) `shouldBe` 4
         it "Can go diagonally" $ do
-            path <- astar cartesianDistance id g (0,0) (4, 3)
+            path <- astar euclideanDistance id g (0,0) (4, 3)
             length (edges path) `shouldBe` 4
         let withhole = removeNodes [ (2, 0)
                                    , (2, 1)
@@ -69,7 +72,7 @@ spec = describe "GenericAlgorithms" $ do
                                    , (3, 2)
                                    ] g
         it "Can still go horizontally, but the long way around" $ do
-            path <- astar cartesianDistance (const 1) withhole (0, 1) (4, 1)
+            path <- astar euclideanDistance id withhole (0, 1) (4, 1)
             length (edges path) `shouldBe` 5
 
 nodes :: Path i e v -> [v]

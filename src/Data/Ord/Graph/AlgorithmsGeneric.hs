@@ -14,12 +14,11 @@
            #-}
 
 module Data.Ord.Graph.AlgorithmsGeneric (
-    Path, PathSegment(..),
-    astarGeneric, astar, dijkstra, cartesianDistance,
+    Path, PathSegment(..), pathCost,
+    astarGeneric, astar, dijkstra, euclideanDistance,
     SearchState(..)
     ) where
 
-import Debug.Trace
 import           Control.Arrow
 import           Control.Applicative hiding (empty)
 import           Control.Lens hiding (Index)
@@ -28,19 +27,13 @@ import           Control.Monad.State
 import           Control.Monad.Except
 import           Control.Monad.Fail (MonadFail)
 
+import           Data.Proxy
 import           Data.Bifunctor
 import           Data.Bifoldable
 import           Data.Bitraversable
 import           Data.Semigroup
 import           Data.Data (Data)
-import           Data.Function (on)
-import           Data.Map (Map)
-import qualified Data.Map as M
-import           Data.Set (Set)
-import qualified Data.Set as S
 import qualified Data.Sequence as Seq
-import           Data.List (partition, minimumBy)
-import           Data.Maybe (catMaybes, mapMaybe, fromMaybe)
 import qualified Data.PriorityQueue.FingerTree as PQ
 
 import           Prelude as P hiding (reverse)
@@ -135,15 +128,24 @@ reconstructPath g = -- maybe (fail "Could not reconstruct path") return
 constantEstimate :: (Num n) => a -> a -> n
 constantEstimate _ _ = 0
 
+-- General interface for cartesian co-ordinates.
+-- Instances are provided for 3 and 3 dimensional tuples
 class (Real n) => CartesianCoordinate x n | x -> n where
-    xy :: x -> (n, n)
+    points :: x -> [n]
 
 instance (Real n) => CartesianCoordinate (n, n) n where
-    xy = id
+    points (x, y) = [x, y]
+
+instance (Real n) => CartesianCoordinate (n, n, n) n where
+    points (x, y, z) = [x, y, z]
     
 -- general purpose function for computing a straight-line distance
--- between two points on a cartesian plane
-cartesianDistance :: (CartesianCoordinate c n, Real n, Floating b) => c -> c -> b
-cartesianDistance (xy -> (x0, y0)) (xy -> (x1, y1)) = sqrt $ dx ^ 2 + dy ^ 2
-    where dx = realToFrac . abs $ x1 - x0
-          dy = realToFrac . abs $ y1 - y0
+-- between two points on a Cartesian plane of an arbitrary number of dimensions
+euclideanDistance :: (CartesianCoordinate c n, Real n, Floating b) => c -> c -> b
+euclideanDistance (points -> ps) (points -> qs)
+    = sqrt . sum . map ((^ 2) . realToFrac . abs) $ zipWith subtract ps qs
+
+pathCost :: (Num n) => (e -> n) -> Path i e v -> n
+pathCost edgeCost = getSum . foldMap segmentCost
+    where segmentCost (PathEdge _ _ e) = Sum $ edgeCost e
+          segmentCost _                = mempty
